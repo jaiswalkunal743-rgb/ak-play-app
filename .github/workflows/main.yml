@@ -1,0 +1,57 @@
+
+name: AK PLAY Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Extract source ZIP files
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip
+          find . -maxdepth 2 -name '*.zip' -print0 | while IFS= read -r -d '' f; do
+            unzip -o "$f" -d extracted
+          done
+
+      - name: Locate Flutter project
+        id: project
+        run: |
+          FILE=$(find . -name pubspec.yaml -not -path './.git/*' | head -n 1)
+          if [ -z "$FILE" ]; then
+            echo "Flutter pubspec.yaml not found. Upload the extracted Flutter source files first."
+            exit 1
+          fi
+          echo "dir=$(dirname "$FILE")" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Build APK
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AK-PLAY-APK
+          path: ${{ steps.project.outputs.dir }}/build/app/outputs/flutter-apk/app-release.apk
+          
